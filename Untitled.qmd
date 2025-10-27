@@ -1,0 +1,117 @@
+---
+title: "Logistical regression"
+format: html
+editor: visual
+---
+
+---
+title: "Launch Forge 2025 Data Science"
+author: "Radiah Khan"
+format: html
+editor: visual
+---
+
+#Upload all the packages
+
+```{r}
+install.packages("readxl")
+library(readxl)
+library(tidyverse)
+library(dplyr)
+```
+
+```{r}
+library(readr)
+profiles_revised <- read_csv("profiles_revised 2.csv")
+View(profiles_revised_2)
+```
+
+# Can sex predict reproduction choices?
+
+```{r}
+#cleaning the dataset 
+library(dplyr)
+
+sex_reproduction <- profiles_revised |>
+  rename(Parental_Status = offspring) |>
+  mutate(Parental_Status = recode(Parental_Status,
+                                  "has a kid" = "Currently a parent",
+                                  "doesn&rsquo;t have kids" = "Currently not a parent",
+                                  "doesn&rsquo;t want kids" = "Not considering to be a parent",
+                                  "wants kids" = "Wants to be a parent",
+                                  "has kids, but doesn&rsquo;t want more" = "Currently a parent but not considering multiple",
+                                  "has a kid, and wants more" = "Currently a parent and considering multiple",
+                                  "might want kids" = "Might consider kids",
+                                  "doesn&rsquo;t have kids, and doesn&rsquo;t want any" = "Neither a current parent nor considering to be in future")) |>
+  filter(Parental_Status %in% c(
+    "Not considering to be a parent",
+    "Currently not a parent",
+    "Wants to be a parent",
+    "Currently a parent",
+    "Neither a current parent nor considering to be in future",
+    "Currently a parent but not considering multiple",
+    "Currently a parent and considering multiple",
+    "Might consider kids"))|>
+  
+  
+# Making the dataset useful for logistic regression
+#Binary Outcome : (Male = 1, Female = 0)
+  
+  mutate(sex = recode(sex, 
+                      "m"= 1,
+                      "f"= 0))|>
+
+mutate(Do_they_want_or_have_or_will_consider_kids = case_when(Parental_Status %in% c("Currently a parent"  , "Wants to be a parent", "Currently a parent and considering multiple"  , "Might consider kids"  ) ~ 1, 
+Parental_Status %in% c("Not considering to be a parent", "Currently not a parent", "Neither a current parent nor considering to be in future", "Currently a parent but not considering multiple" )~0))|>
+  
+select(sex, Do_they_want_or_have_or_will_consider_kids)
+sex_reproduction
+
+```
+
+```{r}
+#Logistical regression 
+fit_sex_reproduction <-glm(sex ~Do_they_want_or_have_or_will_consider_kids,family=binomial(link=logit),data=sex_reproduction)
+summary(fit_sex_reproduction)
+#Statistically significant 
+```
+
+```{r}
+plot(jitter(sex, 0.08) ~ Do_they_want_or_have_or_will_consider_kids,
+     data = sex_reproduction,
+     main = "Scatterplot of Logistic Regression Analysis",
+     xlab = "Do they want/consider kids Status",
+     ylab = "Sex (0 = Female, 1 = Male)")
+
+library(gam)
+library(pROC)
+
+fit <- glm(sex ~ Do_they_want_or_have_or_will_consider_kids,
+           family = binomial, data = sex_reproduction)
+
+plot(jitter(sex, 0.08) ~ Do_they_want_or_have_or_will_consider_kids,
+     data = sex_reproduction,
+     main = "Logistic Regression Fit",
+     xlab = "Do they want/consider kids",
+     ylab = "Sex (0 = Female, 1 = Male)")
+
+pred_vals <- data.frame(Do_they_want_or_have_or_will_consider_kids = c(0,1))
+pred_probs <- predict(fit, newdata = pred_vals, type = "response")
+
+points(pred_vals$Do_they_want_or_have_or_will_consider_kids,
+       pred_probs,
+       col = "red", pch = 19, cex = 2)
+
+segments(0, pred_probs[1], 1, pred_probs[2], col = "red", lwd = 2)
+
+probabilities <- predict(fit, type = "response")
+roc_obj <- roc(sex_reproduction$sex, probabilities)
+auc_value <- auc(roc_obj)
+
+text(x = 0.5, y = 0.2,
+     labels = paste("AUC =", round(auc_value, 4)),
+     adj = 0.5, cex = 1, col = "black")
+
+```
+
+Results :The AUC is just over 50% so it does not have strong predicting powers. Does not have strong predictive powers. The reason might be large sample and small effect size.
