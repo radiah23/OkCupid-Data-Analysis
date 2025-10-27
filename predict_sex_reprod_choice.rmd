@@ -22,7 +22,7 @@ library(dplyr)
 
 ```{r}
 library(readr)
-profiles_revised <- read_csv("profiles_revised 2.csv")
+profiles_revised <- read.csv("/Users/radiahkhan/Documents/OkCupid Dataset Analysis/profiles_revised 2.csv")
 View(profiles_revised_2)
 ```
 
