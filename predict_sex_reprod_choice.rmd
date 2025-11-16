@@ -1,0 +1,126 @@
+---
+title: "Logistical regression"
+format: html
+editor: visual
+---
+
+
+#Upload all the packages
+
+```{r}
+install.packages("readxl")
+library(readxl)
+library(tidyverse)
+library(dplyr)
+```
+
+```{r}
+library(readr)
+profiles_revised <- read.csv("/Users/radiahkhan/Documents/OkCupid Dataset Analysis/profiles_revised 2.csv")
+View(profiles_revised_2)
+```
+
+# Preparing the dataset for the prediction models
+```{r}
+reprod_data <- profiles_revised |>
+  rename(Parental_Status = offspring) |>
+  mutate(Parental_Status = recode(Parental_Status,
+                                  "has a kid" = "Currently a parent",
+                                  "doesn&rsquo;t have kids" = "Currently not a parent",
+                                  "doesn&rsquo;t want kids" = "Not considering to be a parent",
+                                  "wants kids" = "Wants to be a parent",
+                                  "has kids, but doesn&rsquo;t want more" = "Currently a parent but not considering multiple",
+                                  "has a kid, and wants more" = "Currently a parent and considering multiple",
+                                  "might want kids" = "Might consider kids",
+                                  "doesn&rsquo;t have kids, and doesn&rsquo;t want any" = "Neither a current parent nor considering to be in future")) |>
+  filter(Parental_Status %in% c(
+    "Not considering to be a parent", "Currently not a parent", "Wants to be a parent",
+    "Currently a parent", "Neither a current parent nor considering to be in future",
+    "Currently a parent but not considering multiple",
+    "Currently a parent and considering multiple", "Might consider kids")) |>
+  mutate(
+    sex = recode(sex, "m" = 1, "f" = 0),
+    orientation = recode(orientation, "straight" = 1, "gay" = 0, "bisexual" = 0),
+    Do_they_want_or_have_or_will_consider_kids = case_when(
+      Parental_Status %in% c("Currently a parent", "Wants to be a parent", 
+                             "Currently a parent and considering multiple", "Might consider kids") ~ 1,
+      TRUE ~ 0)
+  ) |>
+  select(sex, orientation, Do_they_want_or_have_or_will_consider_kids)
+
+reprod_data
+```
+```{r}
+write.csv(reprod_data, "reprod_data.csv", row.names = FALSE)
+
+```
+
+# Can sex and sexual orientation predict reproduction choices? 
+
+# Do men and women differ in wanting kids? 
+Outcome variable here is decision to have kids
+Predictor variable here is sex 
+
+```{r}
+#Logistical regression Summary (Sex and Reproduction Choices)
+fit_sex_reprod <- glm(Do_they_want_or_have_or_will_consider_kids ~ sex,
+                family = binomial(link = logit),
+                data = reprod_data)
+
+```
+```{r}
+probabilities_sex_reprod <- predict(fit_sex_reprod, type = "response")
+roc_sex <- roc(reprod_data$Do_they_want_or_have_or_will_consider_kids, probabilities_sex_reprod)
+auc_sex <- auc(roc_sex)
+```
+```{r}
+pred_vals <- data.frame(sex = c(0, 1))
+pred_probs <- predict(fit_sex_reprod, newdata = pred_vals, type = "response")
+```
+```{r}
+barplot(pred_probs, 
+        names.arg = c("Female", "Male"),
+        main = "Predicted Probability of Wanting/Having Kids by Sex",
+        ylab = "Probability",
+        xlab = "Sex",
+        col = c("darkblue", "lightblue"),
+        ylim = c(0, 1))
+
+text(x = 1, y = 0.5, 
+     labels = paste("AUC =", round(auc_sex, 4)),
+     cex = 1.3, font = 2)
+```
+
+The AUC is 0.5478 which is slightly over baseline. Weak predictive power. 
+
+
+```{r}
+fit_orientation_reprod <- glm(Do_they_want_or_have_or_will_consider_kids ~ orientation,
+                family = binomial(link = logit),
+                data = reprod_data)
+summary(fit_orientation_reprod)
+```
+```{r}
+pprobabilities_orientation_reprod <- predict(fit_orientation_reprod, type = "response")
+roc_orientation <- roc(reprod_data$Do_they_want_or_have_or_will_consider_kids, probabilities_orientation_reprod)
+auc_orientation <- auc(roc_orientation)
+```
+```{r}
+pred_vals_o <- data.frame(orientation = c(0, 1))
+pred_probs_o <- predict(fit_orientation_reprod, newdata = pred_vals_o, type = "response") 
+```
+```{r}
+barplot(pred_probs_o, 
+        names.arg = c("Queer", "Heterosexual"),  # Changed order and labels
+        main = "Predicted Probability of Wanting/Having Kids by Orientation",  # Changed title
+        ylab = "Probability",
+        xlab = "Orientation",  
+        col = c("purple", "blue"), 
+        ylim = c(0, 1))
+
+text(x = 1.5, y = 0.9,  
+     labels = paste("AUC =", round(auc_orientation, 4)),
+     cex = 1.3, font = 2)
+```
+
+Results : Both sex and orientation is a weak predictor in determining if someone wants kids. Might be due to effect size. 
